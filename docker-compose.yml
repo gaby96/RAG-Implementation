@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  
+  ollama:
+    build: ./ollama
+    container_name: ollama-container
+    ports:
+      - "11434:11434"
+    volumes:
+      - ~/.ollama-models:/root/.ollama/models
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    restart: unless-stopped
+
+  reranker:
+    build:
+      context: ./reranker
+      dockerfile: Dockerfile
+    image: mabentley/reranker:latest
+    container_name: reranker
+    ports:
+      - "8000:8000"  # REST API
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+    depends_on:
+      - ollama
+
+  embedding:
+    build:
+      context: ./embedding
+      dockerfile: Dockerfile
+    image: mabentley/embedding:latest
+    container_name: embedding
+    ports:
+      - "8001:8000"  # REST API
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"  # REST API
+      - "6334:6334"  # gRPC API
+    # volumes:
+    #   - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+
+  # ai-rag-demo:
+  #   build:
+  #     context: ./src/Ai.Rag.Demo
+  #     dockerfile: Dockerfile
+  #   image: mabentley/ai-rag-demo:latest
+  #   container_name: ai-rag-demo
+  #   depends_on:
+  #     - ollama
+  #     - qdrant
+  #     - embedding
+  #     - reranker
+  #   stdin_open: true
+  #   tty: true
+  #   environment:
+  #     - Llm__Endpoint=http://ollama:11434/v1
+  #     - Llm__ApiKey=ollama
+  #     - Llm__ChatDeploymentName=llama3.2:3b
+  #     - Embedding__Endpoint=http://embedding:8000/
+  #     - Reranker__Endpoint=http://reranker:8000/
+  #     - Qdrant__Host=qdrant
+
+# volumes:
+#   qdrant_storage:
